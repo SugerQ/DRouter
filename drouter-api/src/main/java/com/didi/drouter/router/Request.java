@@ -1,9 +1,10 @@
 package com.didi.drouter.router;
 
-import android.arch.lifecycle.LifecycleOwner;
 import android.content.Context;
 import android.net.Uri;
-import android.support.annotation.NonNull;
+
+import androidx.annotation.NonNull;
+import androidx.lifecycle.LifecycleOwner;
 
 import com.didi.drouter.api.DRouter;
 import com.didi.drouter.api.Extend;
@@ -47,6 +48,11 @@ public class Request extends DataExtras<Request> {
         start(context, null);
     }
 
+    /**
+     * @param context If you want to return ActivityResult,
+     *                please use Activity for context and ActivityCallback for RouterCallback.
+     * @param callback Result to return.
+     */
     public void start(Context context, RouterCallback callback) {
         this.context = context == null ? DRouter.getContext() : context;
         RouterLoader.build(this, callback).start();
@@ -73,6 +79,9 @@ public class Request extends DataExtras<Request> {
         return this;
     }
 
+    /**
+     * @param authority ContentProvider authority for remote process.
+     */
     public Request setRemoteAuthority(String authority) {
         this.authority = authority;
         return this;

@@ -2,8 +2,8 @@
 
 <div align="center">
  <img src="https://img.shields.io/badge/license-Apache2.0-brightgreen.svg" align=left />
- <img src="https://img.shields.io/badge/drouter--plugin--proxy-1.0.0-red.svg" align=left />
- <img src="https://img.shields.io/badge/drouter--api-1.0.3-blue.svg" align=left />
+ <img src="https://img.shields.io/badge/drouter--plugin--proxy-1.0.1-red.svg" align=left />
+ <img src="https://img.shields.io/badge/drouter--api-2.0.0-blue.svg" align=left />
  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" align=left />
 </div>
 <br/>
@@ -13,11 +13,11 @@ DRouter是滴滴乘客端自研的一套Android路由框架，基于平台化解
 
 ## 提供功能
 
-- 使用URI字符串导航Activity、Fragment、View、RouterHandler，支持正则表达式
+- 使用URI字符串导航Activity、Fragment、View、RouterHandler，注解支持正则表达式、占位符
 - 回调式onActivityResult
 - RouterHandler、Activity支持等待异步完成(hold)，并可设置超时时间
 - RouterHandler指定执行线程
-- 注入拦截器，支持全局拦截器和局部拦截器，面向切面编程
+- 注入拦截器，支持全局拦截器和局部拦截器，面向切面编程，拦截器可以使用字符串名字
 - 更为多样化的Fragment页面跳转能力
 - 使用接口或基类导航到实现类Service的Class以及实例
 - 支持Service别名以及多维过滤器查找
@@ -27,6 +27,7 @@ DRouter是滴滴乘客端自研的一套Android路由框架，基于平台化解
 - 跨进程访问无需提前绑定、如同本地调用一样进行访问
 - 支持客户端进程和服务端进程自动重连
 - 支持VirtualApk
+- 适配AndroidX
 
 ### 技术特点
 1. 插件支持增量编译、多线程扫描、以及运行时异步加载路由表，尽其所能提高效率
@@ -52,13 +53,19 @@ Page | 支持单Page、栈Page、ViewPager三种形式的Fragment加载
 
 ``` java
 /** 最新版本 **/
-classpath "com.didi.drouter:drouter-plugin-proxy:1.0.0"
-api "com.didi.drouter:drouter-api:1.0.3"
+classpath "io.github.didi:drouter-plugin-proxy:1.0.1"
+api "io.github.didi:drouter-api:2.0.0"
 ```
 
 ## 微信交流群
 
-微信群二维码有期限，请搜索 gwball 加我微信入群，可备注 DRouter
+<img src="https://czp.s3.didiyunapi.com/image/drouter/drouter.jpg" width="250px" align="center" alt="WeiXin"/>
+
+如果二维码到期，请搜索 gwball 加作者微信(备注DRouter)入群
+
+## 相关文章
+
+[滴滴开源DRouter：一款高效的Android路由框架](https://juejin.cn/post/6975818153381068831)
 
 ## License
 

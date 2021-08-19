@@ -4,10 +4,11 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.didi.drouter.api.DRouter;
 import com.didi.drouter.api.Extend;
@@ -39,7 +40,9 @@ public class MainActivity extends AppCompatActivity {
 
         switch (view.getId()) {
             case R.id.start_activity1:
-                DRouter.build("/activity/test1").putExtra("key", "value").start(this);
+                DRouter.build("/activity/Test1_Value1_Value2?Arg3=Value3")
+                        .putExtra("Arg4", "Value4")
+                        .start(this);
                 break;
 
             case R.id.start_activity2:

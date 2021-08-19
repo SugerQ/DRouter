@@ -1,6 +1,7 @@
 package com.didi.drouter.annotation;
 
-import android.support.annotation.Keep;
+
+import androidx.annotation.Keep;
 
 import com.didi.drouter.api.Extend;
 import com.didi.drouter.router.IRouterInterceptor;
@@ -43,6 +44,8 @@ public @interface Router {
      */
     Class<? extends IRouterInterceptor>[] interceptor() default {};
 
+    String[] interceptorName() default {};
+
     /**
      * Used for IRouterHandler
      */
@@ -59,6 +62,8 @@ public @interface Router {
      * At the same time, you must execute
      * {@link com.didi.drouter.router.RouterHelper#release(Request)}}
      * in any place after hold task is done.
+     *
+     * This take effect only when start with RouterCallback
      */
     boolean hold() default false;
 }

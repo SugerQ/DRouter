@@ -1,9 +1,10 @@
 package com.didi.demo.handler;
 
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.didi.drouter.annotation.Router;
 import com.didi.drouter.api.DRouter;
@@ -42,9 +43,7 @@ public class DynamicActivity extends AppCompatActivity {
                     }
                 });
 
-        if (iRegister1.isSuccess() && iRegister2.isSuccess()) {
-            RouterLogger.toast("动态注册成功");
-        }
+        RouterLogger.toast("动态注册成功");
 
         findViewById(R.id.click_handler).setOnClickListener(new View.OnClickListener() {
             @Override

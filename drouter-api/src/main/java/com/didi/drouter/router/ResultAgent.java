@@ -1,11 +1,10 @@
 package com.didi.drouter.router;
 
-import android.arch.lifecycle.Lifecycle;
-import android.arch.lifecycle.LifecycleObserver;
-import android.arch.lifecycle.LifecycleOwner;
-import android.arch.lifecycle.OnLifecycleEvent;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.OnLifecycleEvent;
 
 import com.didi.drouter.utils.RouterLogger;
 import com.didi.drouter.utils.TextUtils;
@@ -57,7 +56,7 @@ class ResultAgent {
         if (primaryRequest.lifecycleOwner != null) {
             primaryRequest.lifecycleOwner.getLifecycle().addObserver(new LifecycleObserver() {
                 @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                public void onDestroy(@NonNull LifecycleOwner owner) {
+                public void onDestroy() {
                     if (numberToResult.containsKey(primaryRequest.getNumber())) {
                         RouterLogger.getCoreLogger().w(
                                 "request \"%s\" lifecycleOwner \"%s\" destroy and complete",
@@ -132,15 +131,18 @@ class ResultAgent {
 
     // finish
     private synchronized static void completePrimary(@NonNull Result result) {
-        RouterLogger.getCoreLogger().d("primary request \"%s\" complete, all reason %s",
-                result.agent.primaryRequest.getNumber(), result.agent.branchReasonMap.toString());
+        RouterLogger.getCoreLogger().d(
+                "primary request \"%s\" complete, router uri \"%s\", all reason %s",
+                result.agent.primaryRequest.getNumber(), result.agent.primaryRequest.getUri(),
+                result.agent.branchReasonMap.toString());
         numberToResult.remove(result.agent.primaryRequest.getNumber());
         if (result.agent.callback != null) {
             result.agent.callback.onResult(result);
         }
         if (!numberToResult.containsKey(result.agent.primaryRequest.getNumber())) {
             RouterLogger.getCoreLogger().d(
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+                    "Request finish " +
+                            "------------------------------------------------------------");
         }
     }
 }

@@ -1,22 +1,21 @@
 package com.didi.drouter.store;
 
-
-import android.arch.lifecycle.Lifecycle;
-import android.arch.lifecycle.LifecycleObserver;
-import android.arch.lifecycle.LifecycleOwner;
-import android.arch.lifecycle.OnLifecycleEvent;
 import android.net.Uri;
-import android.support.annotation.NonNull;
-import android.support.v4.util.ArraySet;
-import android.support.v4.util.Pair;
 import android.util.Log;
+import android.util.Pair;
+
+import androidx.annotation.MainThread;
+import androidx.annotation.NonNull;
+import androidx.collection.ArraySet;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.OnLifecycleEvent;
 
 import com.didi.drouter.api.Extend;
 import com.didi.drouter.loader.host.InterceptorLoader;
 import com.didi.drouter.loader.host.RouterLoader;
 import com.didi.drouter.loader.host.ServiceLoader;
 import com.didi.drouter.router.IRouterHandler;
-import com.didi.drouter.router.IRouterInterceptor;
 import com.didi.drouter.utils.ReflectUtil;
 import com.didi.drouter.utils.RouterLogger;
 
@@ -40,8 +39,8 @@ public class RouterStore {
     // key is uriKey，value is meta, with dynamic
     // key is REGEX_ROUTER，value is map<uriKey, meta>
     private static final Map<String, Object> routerMetas = new ConcurrentHashMap<>();
-    // key is interceptor impl
-    private static final Map<Class<? extends IRouterInterceptor>, RouterMeta> interceptorMetas = new ConcurrentHashMap<>();
+    // key is interceptor impl or string name
+    private static Map<Object, RouterMeta> interceptorMetas = new ConcurrentHashMap<>();
     // key is interface，value is set, with dynamic
     private static final Map<Class<?>, Set<RouterMeta>> serviceMetas = new ConcurrentHashMap<>();
 
@@ -131,10 +130,12 @@ public class RouterStore {
     public static Set<RouterMeta> getRouterMetas(@NonNull Uri uriKey) {
         check();
         Set<RouterMeta> result = new ArraySet<>();
+        // exact match
         Object o = routerMetas.get(uriKey.toString());
         if (o instanceof RouterMeta) {
             result.add((RouterMeta) o);
         }
+        // fuzzy match include regex and placeholder
         Map<String, RouterMeta> regex = (Map<String, RouterMeta>) routerMetas.get(REGEX_ROUTER);
         if (regex != null) {
             for (RouterMeta meta : regex.values()) {
@@ -147,7 +148,7 @@ public class RouterStore {
     }
 
     @NonNull
-    public static Map<Class<? extends IRouterInterceptor>, RouterMeta> getInterceptors() {
+    public static Map<Object, RouterMeta> getInterceptors() {
         check();
         return interceptorMetas;
     }
@@ -163,16 +164,16 @@ public class RouterStore {
     }
 
     @NonNull
-    // LegalUri is unique, can't duplicate with existing.
+    @MainThread
     public synchronized static IRegister register(final RouterKey key, final IRouterHandler handler) {
         if (key == null || handler == null) {
             throw new IllegalArgumentException("argument null illegal error");
         }
         check();
-        boolean success = false;
         RouterMeta meta = RouterMeta.build(RouterMeta.HANDLER).assembleRouter(
                 key.uri.getScheme(), key.uri.getHost(), key.uri.getPath(),
-                (Class<?>) null, null, key.interceptor, key.thread, 0, key.hold);
+                (Class<?>) null, null, key.interceptor, key.interceptorName,
+                key.thread, 0, key.hold);
         meta.setHandler(key, handler);
         if (meta.isRegexUri()) {
             Map<String, RouterMeta> regexMap = (Map<String, RouterMeta>) routerMetas.get(REGEX_ROUTER);
@@ -180,46 +181,44 @@ public class RouterStore {
                 regexMap = new ConcurrentHashMap<>();
                 routerMetas.put(REGEX_ROUTER, regexMap);
             }
-            if (!regexMap.containsKey(meta.getLegalUri())) {
-                success = true;
-                regexMap.put(meta.getLegalUri(), meta);
-            }
+            regexMap.put(meta.getLegalUri(), meta);
         } else {
-            if (!routerMetas.containsKey(meta.getLegalUri())) {
-                success = true;
-                routerMetas.put(meta.getLegalUri(), meta);
-            }
+            routerMetas.put(meta.getLegalUri(), meta);
         }
-        if (success) {
-            if (key.lifecycleOwner != null) {
-                key.lifecycleOwner.getLifecycle().addObserver(new LifecycleObserver() {
-                    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                    public void onDestroy(@NonNull LifecycleOwner owner) {
-                        unregister(key, handler);
-                    }
-                });
-            }
-            RouterLogger.getCoreLogger().d("register \"%s\" with handler \"%s\" success",
-                    meta.getLegalUri(), handler.getClass().getSimpleName());
-            return new RouterRegister(key, handler, true);
+        if (key.lifecycleOwner != null) {
+            key.lifecycleOwner.getLifecycle().addObserver(new LifecycleObserver() {
+                @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                public void onDestroy() {
+                    unregister(key, handler);
+                }
+            });
         }
-        return new RouterRegister(key, handler, false);
+        RouterLogger.getCoreLogger().d("register \"%s\" with handler \"%s\" success",
+                meta.getLegalUri(), handler.getClass().getSimpleName());
+        return new RouterRegister(key, handler);
     }
 
+    @MainThread
     synchronized static void unregister(RouterKey key, IRouterHandler handler) {
         if (key != null && handler != null) {
             RouterMeta meta = RouterMeta.build(RouterMeta.HANDLER).assembleRouter(
                     key.uri.getScheme(), key.uri.getHost(), key.uri.getPath(),
                     (Class<?>) null, null,
-                    key.interceptor, key.thread, 0, key.hold);
+                    key.interceptor, key.interceptorName, key.thread, 0, key.hold);
             boolean success = false;
             if (meta.isRegexUri()) {
                 Map<String, RouterMeta> regexMap = (Map<String, RouterMeta>) routerMetas.get(REGEX_ROUTER);
                 if (regexMap != null) {
-                    success = regexMap.remove(meta.getLegalUri()) != null;
+                    RouterMeta curMeta = regexMap.get(meta.getLegalUri());
+                    if (curMeta != null && curMeta.getHandler() == handler) {
+                        success = regexMap.remove(meta.getLegalUri()) != null;
+                    }
                 }
             } else {
-                success = routerMetas.remove(meta.getLegalUri()) != null;
+                RouterMeta curMeta = (RouterMeta) routerMetas.get(meta.getLegalUri());
+                if (curMeta != null && curMeta.getHandler() == handler) {
+                    success = routerMetas.remove(meta.getLegalUri()) != null;
+                }
             }
             if (success) {
                 RouterLogger.getCoreLogger().d("unregister \"%s\" with handler \"%s\" success",
@@ -229,6 +228,7 @@ public class RouterStore {
     }
 
     @NonNull
+    @MainThread
     public synchronized static <T> IRegister register(final ServiceKey<T> key, final T service) {
         if (key == null || key.function == null || service == null) {
             throw new IllegalArgumentException("argument null illegal error");
@@ -247,17 +247,17 @@ public class RouterStore {
         if (key.lifecycleOwner != null) {
             key.lifecycleOwner.getLifecycle().addObserver(new LifecycleObserver() {
                 @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                public void onDestroy(@NonNull LifecycleOwner owner) {
+                public void onDestroy() {
                     unregister(key, service);
                 }
             });
         }
         RouterLogger.getCoreLogger().d("register \"%s\" with service \"%s\" success, size:%s",
                 key.function.getSimpleName(), service, metas.size());
-        return new RouterRegister(key, service, true);
+        return new RouterRegister(key, service);
     }
 
-    public synchronized static void unregister(ServiceKey<?> key, Object service) {
+    synchronized static void unregister(ServiceKey<?> key, Object service) {
         if (key != null && service != null) {
             Set<RouterMeta> metas = serviceMetas.get(key.function);
             if (metas != null) {

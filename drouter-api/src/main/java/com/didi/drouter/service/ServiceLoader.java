@@ -1,7 +1,7 @@
 package com.didi.drouter.service;
 
-import android.arch.lifecycle.LifecycleOwner;
-import android.support.annotation.NonNull;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.annotation.NonNull;
 
 import com.didi.drouter.api.Extend;
 
@@ -33,6 +33,9 @@ public class ServiceLoader<T> {
         return this;
     }
 
+    /**
+     * @param authority ContentProvider authority for remote process.
+     */
     public ServiceLoader<T> setRemoteAuthority(String authority) {
         serviceAgent.setRemoteAuthority(authority);
         return this;
@@ -58,7 +61,7 @@ public class ServiceLoader<T> {
     }
 
     /**
-     * When there is no service return from {@link ServiceLoader#getService(Object...)},
+     * When there is no service return from {@link ServiceLoader#getService(Object...)} with no remote,
      * this object can be returned by default.
      */
     public ServiceLoader<T> setDefaultIfEmpty(T defaultService) {
@@ -66,6 +69,10 @@ public class ServiceLoader<T> {
         return this;
     }
 
+    /**
+     * Remote process support.
+     * When executed locally, null may be returned, but not if executed through remote process.
+     */
     public T getService(Object... parameter) {
         return serviceAgent.getService(parameter);
     }

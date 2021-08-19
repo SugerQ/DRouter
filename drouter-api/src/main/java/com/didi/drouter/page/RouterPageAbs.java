@@ -1,20 +1,21 @@
 package com.didi.drouter.page;
 
-import android.arch.lifecycle.Lifecycle;
-import android.arch.lifecycle.LifecycleObserver;
-import android.arch.lifecycle.LifecycleOwner;
-import android.arch.lifecycle.OnLifecycleEvent;
+import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
-import android.support.v4.util.ArraySet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import com.didi.drouter.R;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.collection.ArraySet;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.OnLifecycleEvent;
+
 import com.didi.drouter.api.DRouter;
 import com.didi.drouter.router.Result;
 import com.didi.drouter.router.RouterCallback;
@@ -27,9 +28,11 @@ import java.util.Set;
  */
 public abstract class RouterPageAbs implements IPageRouter {
 
-    protected Set<IPageObserver> observers = new ArraySet<>();
-    protected IPageBean currentPage = new IPageBean.EmptyPageBean();
-    protected Bundle bundle = new Bundle();
+    private Set<IPageObserver> observers = new ArraySet<>();
+    private IPageBean currentPage = new IPageBean.EmptyPageBean();
+    // for stick
+    private IPageBean lastPage = new IPageBean.EmptyPageBean();
+    private int lastChangeType;
 
     @Override
     public void popPage() {
@@ -47,15 +50,20 @@ public abstract class RouterPageAbs implements IPageRouter {
     }
 
     @Override
-    public void addPageObserver(final IPageObserver listener, @Nullable LifecycleOwner owner) {
-        observers.add(listener);
-        if (owner != null) {
-            owner.getLifecycle().addObserver(new LifecycleObserver() {
-                @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                public void onDestroy(@NonNull LifecycleOwner owner) {
-                    removePageObserver(listener);
-                }
-            });
+    public void addPageObserver(final IPageObserver listener, boolean sticky, @Nullable LifecycleOwner owner) {
+        if (listener != null) {
+            if (sticky && (!(lastPage instanceof IPageBean.EmptyPageBean) || !(currentPage instanceof IPageBean.EmptyPageBean))) {
+                listener.onPageChange(lastPage, currentPage, lastChangeType);
+            }
+            observers.add(listener);
+            if (owner != null) {
+                owner.getLifecycle().addObserver(new LifecycleObserver() {
+                    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                    public void onDestroy() {
+                        removePageObserver(listener);
+                    }
+                });
+            }
         }
     }
 
@@ -64,16 +72,24 @@ public abstract class RouterPageAbs implements IPageRouter {
         observers.remove(listener);
     }
 
-    protected void notifyPageChanged(IPageBean toUri) {
-        if (!toUri.getPageUri().equals(currentPage.getPageUri())) {
-            for (IPageObserver observer : observers) {
-                observer.onPageChange(currentPage, toUri);
-            }
-            currentPage = toUri;
+    /**
+     * @param toUri target uri
+     * @param changeType change reason {@link com.didi.drouter.page.IPageRouter.IPageObserver}
+     * @param filter whether filter repeated page
+     */
+    protected void notifyPageChanged(IPageBean toUri, int changeType, boolean filter) {
+        if (filter && toUri.getPageUri().equals(currentPage.getPageUri())) {
+            return;
         }
+        for (IPageObserver observer : observers) {
+            observer.onPageChange(currentPage, toUri, changeType);
+        }
+        lastChangeType = changeType;
+        lastPage = currentPage;
+        currentPage = toUri;
     }
 
-    protected @NonNull Fragment newFragment(String uri) {
+    protected @NonNull Fragment createFragment(String uri) {
         final Fragment[] fragments = {null};
         DRouter.build(uri).start(null, new RouterCallback() {
             @Override
@@ -83,13 +99,14 @@ public abstract class RouterPageAbs implements IPageRouter {
         });
         if (fragments[0] == null) {
             RouterLogger.getCoreLogger().e(
-                    "PageRouter get null fragment with uri: \"%s\", StackTrace:\n %s", uri, new Throwable());
+                    "PageRouter get null fragment with uri: \"%s\", StackTrace:\n %s",
+                    uri, new Throwable());
             return new EmptyFragment();
         }
         return fragments[0];
     }
 
-    protected void addArgsForFragment(Fragment fragment, Bundle... bundles) {
+    protected void putArgsForFragment(Fragment fragment, Bundle... bundles) {
         Bundle bundle = new Bundle();
         if (fragment.getArguments() != null) {
             bundle.putAll(fragment.getArguments());
@@ -103,12 +120,13 @@ public abstract class RouterPageAbs implements IPageRouter {
     }
 
     public static class EmptyFragment extends Fragment {
+        @SuppressLint("SetTextI18n")
         @Nullable
         @Override
-        public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
+        public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                                  @Nullable Bundle savedInstanceState) {
             TextView textView = new TextView(getContext());
-            textView.setText(R.string.drouter_empty_fragment);
+            textView.setText("RouterEmptyFragment");
             return textView;
         }
     }

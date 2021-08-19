@@ -1,7 +1,8 @@
 package com.didi.drouter.store;
 
-import android.arch.lifecycle.LifecycleOwner;
 import android.net.Uri;
+
+import androidx.lifecycle.LifecycleOwner;
 
 import com.didi.drouter.api.Extend;
 import com.didi.drouter.router.IRouterInterceptor;
@@ -14,6 +15,7 @@ public class RouterKey {
 
     Uri uri;
     Class<? extends IRouterInterceptor>[] interceptor;
+    String[] interceptorName;
     int thread;
     boolean hold;
     LifecycleOwner lifecycleOwner;
@@ -33,6 +35,11 @@ public class RouterKey {
     @SafeVarargs
     public final RouterKey setInterceptor(Class<? extends IRouterInterceptor>... interceptor) {
         this.interceptor = interceptor;
+        return this;
+    }
+
+    public final RouterKey setInterceptorName(String... interceptorName) {
+        this.interceptorName = interceptorName;
         return this;
     }
 

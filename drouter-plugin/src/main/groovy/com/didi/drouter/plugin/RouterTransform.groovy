@@ -1,15 +1,12 @@
 package com.didi.drouter.plugin
 
 import com.android.build.api.transform.*
-import com.android.build.gradle.api.ApplicationVariant
-import com.android.build.gradle.api.BaseVariant
 import com.android.build.gradle.internal.pipeline.TransformManager
 import com.didi.drouter.utils.Logger
 import com.didi.drouter.utils.SystemUtil
 import com.google.common.collect.ImmutableSet
 import org.apache.commons.io.FileUtils
 import org.gradle.api.Project
-import org.gradle.api.internal.DefaultDomainObjectCollection
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -20,8 +17,12 @@ class RouterTransform extends Transform {
 
     Project project
     Queue<File> compilePath
+
+    // path.class (class file)
+    // jar:file:path.jar!entry.class (class in jar)
+    // path.jar (jar file added in transform)
+    Set<String> cachePath
     File cacheFile
-    Set<String> cachePath  //.class | .jar | .jar!/.class
 
     RouterTransform(Project project) {
         this.project = project
@@ -98,8 +99,8 @@ class RouterTransform extends Transform {
                         Logger.p(" transform to: " + changedSourceDest.absolutePath)
                     }
                     switch (status) {
-                        case Status.ADDED:
-                        case Status.CHANGED:
+                        case Status.ADDED:     // rename or add
+                        case Status.CHANGED:   // modified
                             if (changedSource.isFile()) {
                                 FileUtils.copyFile(changedSource, changedSourceDest)
                                 if (changedSource.absolutePath.endsWith(".class")) {
@@ -114,14 +115,16 @@ class RouterTransform extends Transform {
                                 }
                             }
                             break
-                        case Status.REMOVED:
-                            // for changedSource has been deleted
+                        case Status.REMOVED:   // rename or delete
+                            // changed source file has been deleted
+                            compilePath.remove(directoryInput.file)
                             if (changedSourceDest.isFile()) {
                                 changedSourceDest.delete()
                                 if (changedSource.absolutePath.endsWith(".class")) {
                                     cachePath.remove(changedSource.absolutePath)
                                 }
                             } else {
+                                // delete all classes under this folder
                                 changedSourceDest.deleteDir()
                                 Iterator<String> iterator = cachePath.iterator()
                                 while (iterator.hasNext()) {
@@ -157,8 +160,10 @@ class RouterTransform extends Transform {
                     case Status.ADDED:
                     case Status.CHANGED:
                         FileUtils.copyFile(changedSource, changedSourceDest)
+                        // add again, and remove it later after resolving jar
                         cachePath.add(changedSource.absolutePath)
                         if (jarInput.status == Status.CHANGED) {
+                            // delete all classes under this jar, as we don't know which changed.
                             Iterator<String> iterator = cachePath.iterator()
                             while (iterator.hasNext()) {
                                 if (iterator.next().startsWith("jar:file:" + changedSource.absolutePath)) {
@@ -168,6 +173,7 @@ class RouterTransform extends Transform {
                         }
                         break
                     case Status.REMOVED:
+                        compilePath.remove(jarInput.file)
                         changedSourceDest.delete()
                         Iterator<String> iterator = cachePath.iterator()
                         while (iterator.hasNext()) {

@@ -3,10 +3,10 @@ package com.didi.drouter.router;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
 import android.view.View;
+
+import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.Fragment;
 
 import com.didi.drouter.api.Extend;
 import com.didi.drouter.store.RouterMeta;
@@ -34,7 +34,7 @@ class RouterDispatcher {
                 startView(request, meta, result);
                 break;
             case RouterType.HANDLER:
-                startHandler(request, meta, result);
+                startHandler(request, meta, result, callback);
                 break;
             default:
                 break;
@@ -56,11 +56,12 @@ class RouterDispatcher {
         }
         intent.putExtra(ResultAgent.FIELD_START_ACTIVITY_REQUEST_NUMBER, request.getNumber());
         intent.putExtras(request.getExtra());
-        if (context instanceof FragmentActivity && callback instanceof RouterCallback.ActivityCallback) {
-            HolderFragment.start((FragmentActivity) context, intent,
-                    1024, (RouterCallback.ActivityCallback) callback);
-        } else if (context instanceof Activity && request.getExtra().containsKey(Extend.START_ACTIVITY_REQUEST_CODE)) {
-            int requestCode = request.getInt(Extend.START_ACTIVITY_REQUEST_CODE);
+        boolean hasRequestCode = request.getExtra().containsKey(Extend.START_ACTIVITY_REQUEST_CODE);
+        int requestCode = hasRequestCode? request.getInt(Extend.START_ACTIVITY_REQUEST_CODE) : 1024;
+        if (context instanceof Activity && callback instanceof RouterCallback.ActivityCallback) {
+            ActivityCompat2.startActivityForResult((Activity) context, intent,
+                    requestCode, (RouterCallback.ActivityCallback) callback);
+        } else if (context instanceof Activity && hasRequestCode) {
             ActivityCompat.startActivityForResult((Activity) context, intent,
                     requestCode, intent.getBundleExtra(Extend.START_ACTIVITY_OPTIONS));
         } else {
@@ -71,11 +72,11 @@ class RouterDispatcher {
             ((Activity) context).overridePendingTransition(anim[0], anim[1]);
         }
         result.isActivityStarted = true;
-        if (!meta.isHold()) {
-            ResultAgent.release(request, ResultAgent.STATE_COMPLETE);
-        } else {
-            RouterLogger.getCoreLogger().w("request \"%s\" will be held", request.getNumber());
+        if (meta.isHold() && callback != null) {
+            RouterLogger.getCoreLogger().w("request \"%s\" will be hold", request.getNumber());
             Monitor.startMonitor(request, result);
+        } else {
+            ResultAgent.release(request, ResultAgent.STATE_COMPLETE);
         }
     }
 
@@ -105,7 +106,8 @@ class RouterDispatcher {
         ResultAgent.release(request, ResultAgent.STATE_COMPLETE);
     }
 
-    private static void startHandler(final Request request, final RouterMeta meta, final Result result) {
+    private static void startHandler(final Request request, final RouterMeta meta,
+                                     final Result result, final RouterCallback callback) {
         // dynamic
         IRouterHandler handler = meta.getHandler();
         if (handler == null) {
@@ -121,10 +123,10 @@ class RouterDispatcher {
                         RouterLogger.getCoreLogger().w("request \"%s\" will hold", request.getNumber());
                     }
                     finalHandler.handle(request, result);
-                    if (!meta.isHold()) {
-                        ResultAgent.release(request, ResultAgent.STATE_COMPLETE);
-                    } else {
+                    if (meta.isHold() && callback != null) {
                         Monitor.startMonitor(request, result);
+                    } else {
+                        ResultAgent.release(request, ResultAgent.STATE_COMPLETE);
                     }
                 }
             });

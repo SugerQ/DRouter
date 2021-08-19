@@ -79,7 +79,7 @@ class JarUtils {
         String min = metaInfo.get("plugin-min-support")
         Logger.w("Please first make sure plugin-version " + metaInfo.get("plugin-version") +
                 "(current) >= " + min + "(min support)")
-        Logger.w("Any question you can call \"gaowei\" or join weixin \"122525660\"")
+        Logger.w("Any question you can call \"GaoWei\" from weixin \"gwball\"")
     }
 
     private static void sendRequest(String appId, String pluginVersion, String apiVersion) {
@@ -93,6 +93,6 @@ class JarUtils {
         connection.setConnectTimeout(15000)
         connection.setReadTimeout(60000)
         def response = connection.inputStream.text
-        Logger.d("compile statistic response = " + response)
+        //Logger.d("compile statistic response = " + response)
     }
 }

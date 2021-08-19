@@ -33,8 +33,7 @@ proguard/
 #mac specific file
 .DS_Store
 
-/bugly
-/.aar
-/host
-/DRouter
-/DRouter.wiki
+upload-didi.gradle
+upload-jcenter.gradle
+upload-maven.gradle
+*.gpg

@@ -1,21 +1,24 @@
 package com.didi.demo.fragment;
 
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.view.ViewPager;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager.widget.ViewPager;
+
 import com.didi.drouter.annotation.Router;
 import com.didi.drouter.api.DRouter;
 import com.didi.drouter.demo.R;
-import com.didi.drouter.store.ServiceKey;
-import com.didi.drouter.utils.RouterLogger;
 import com.didi.drouter.page.IPageBean;
 import com.didi.drouter.page.IPageRouter;
 import com.didi.drouter.page.RouterPageViewPager;
+import com.didi.drouter.store.ServiceKey;
+import com.didi.drouter.utils.RouterLogger;
+
+import static androidx.fragment.app.FragmentPagerAdapter.BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT;
 
 @Router(path = "/activity/router_page_viewpager")
 public class RouterPageViewPagerActivity extends AppCompatActivity {
@@ -31,19 +34,14 @@ public class RouterPageViewPagerActivity extends AppCompatActivity {
         viewPager.setId(R.id.drouter_view_pager);
         ((ViewGroup)findViewById(R.id.fragment_container)).addView(viewPager);
 
-        pageRouter = new RouterPageViewPager(getSupportFragmentManager(), viewPager);
-        pageRouter.addPageObserver(new IPageRouter.IPageObserver() {
-            @Override
-            public void onPageChange(@NonNull IPageBean from, @NonNull IPageBean to) {
-                RouterLogger.getAppLogger().d(from.getPageUri() +  " -> " + to.getPageUri());
-            }
-        }, this);
+        pageRouter = new RouterPageViewPager(getSupportFragmentManager(), viewPager, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT);
         DRouter.register(
                 ServiceKey.build(IPageRouter.class).setAlias("router_page_viewpager").setLifecycleOwner(this),
                 pageRouter);
 
 
         pageRouter.update(
+                new IPageBean.DefPageBean("/fragment/first/0"),
                 new IPageBean.DefPageBean("/fragment/first/1"),
                 new IPageBean.DefPageBean("/fragment/first/2"),
                 new IPageBean.DefPageBean("/fragment/first/3"),
@@ -51,14 +49,22 @@ public class RouterPageViewPagerActivity extends AppCompatActivity {
                 new IPageBean.DefPageBean("/fragment/first/5"),
                 new IPageBean.DefPageBean("/fragment/first/6"));
 
+        pageRouter.addPageObserver(new IPageRouter.IPageObserver() {
+            @Override
+            public void onPageChange(@NonNull IPageBean from, @NonNull IPageBean to, int type) {
+                RouterLogger.getAppLogger().d(from.getPageUri() +  " -> " + to.getPageUri() + "  type:" + type);
+            }
+        }, false, this);
+
         ((TextView)findViewById(R.id.btn1)).setText("修改数据");
         ((TextView)findViewById(R.id.btn2)).setText("切换页面");
     }
 
     public void onClick1(View view) {
         pageRouter.update(
-                new IPageBean.DefPageBean("/fragment/first/4"),
-                new IPageBean.DefPageBean("/fragment/first/5"));
+                new IPageBean.DefPageBean("/fragment/first/0-"),
+                new IPageBean.DefPageBean("/fragment/first/1-"),
+                new IPageBean.DefPageBean("/fragment/first/2-"));
     }
 
     public void onClick2(View view) {

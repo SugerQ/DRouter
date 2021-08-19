@@ -1,11 +1,13 @@
 package com.didi.drouter.remote;
 
-import android.arch.lifecycle.LifecycleOwner;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.Nullable;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.lifecycle.LifecycleOwner;
 
 import java.lang.ref.WeakReference;
 import java.util.Arrays;
@@ -47,7 +49,7 @@ class RemoteCommand implements Parcelable {
     }
 
     @SuppressWarnings("unchecked")
-    RemoteCommand(Parcel in) {
+    private RemoteCommand(Parcel in) {
         type = in.readInt();
         if (type == REQUEST) {
             uri = in.readString();
@@ -142,6 +144,7 @@ class RemoteCommand implements Parcelable {
         return Arrays.hashCode(new Object[]{type, uri, serviceClass, alias, feature, methodName, bridge});
     }
 
+    @NonNull
     @Override
     public String toString() {
         if (type == REQUEST) {

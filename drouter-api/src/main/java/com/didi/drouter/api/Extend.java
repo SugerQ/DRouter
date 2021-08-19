@@ -1,6 +1,6 @@
 package com.didi.drouter.api;
 
-import android.support.annotation.IntDef;
+import androidx.annotation.IntDef;
 
 import com.didi.drouter.router.RouterCallback;
 
@@ -64,7 +64,14 @@ public class Extend {
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({Resend.NO_RESEND, Resend.WAIT_ALIVE})
     public @interface Resend {
+        /**
+         * Resend strategy: No resend
+         */
         int NO_RESEND   = 0;
+        /**
+         * Resend strategy: Client command will hold and wait until Server restart
+         * Please refer to {@link RouterLifecycle} to control resend switch
+         */
         int WAIT_ALIVE  = 1;
     }
 

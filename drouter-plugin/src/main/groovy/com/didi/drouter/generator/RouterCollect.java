@@ -8,9 +8,12 @@ import com.didi.drouter.utils.StoreUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javassist.ClassPool;
@@ -21,6 +24,7 @@ import javassist.bytecode.annotation.Annotation;
 import javassist.bytecode.annotation.ArrayMemberValue;
 import javassist.bytecode.annotation.ClassMemberValue;
 import javassist.bytecode.annotation.MemberValue;
+import javassist.bytecode.annotation.StringMemberValue;
 
 /**
  * Created by gaowei on 2018/8/30
@@ -28,7 +32,9 @@ import javassist.bytecode.annotation.MemberValue;
 class RouterCollect extends AbsRouterCollect {
 
     private final Map<String, CtClass> routerClass = new ConcurrentHashMap<>();
-    private final Pattern pattern = Pattern.compile("[\\w/]*");  // identifier or /
+    private final Pattern pattern = Pattern.compile("[\\w/]*");  // \w or /
+    // <> inside can't contains < or >, this pattern means using placeholder
+    private final Pattern placeholderPattern = Pattern.compile("<[^<>]*>");
     private final List<String> items = new ArrayList<>();
 
     RouterCollect(ClassPool pool, RouterSetting setting) {
@@ -55,6 +61,7 @@ class RouterCollect extends AbsRouterCollect {
         for (CtClass routerCc : routerClass.values()) {
             try {
                 StringBuilder interceptorClass = null;
+                StringBuilder interceptorName = null;
 
                 String schemeValue = "";
                 String hostValue = "";
@@ -65,9 +72,9 @@ class RouterCollect extends AbsRouterCollect {
                 int priority = 0;
                 boolean hold = false;
                 if (routerCc.hasAnnotation(Router.class)) {
-                    schemeValue = ((Router) routerCc.getAnnotation(Router.class)).scheme().toLowerCase();
-                    hostValue = ((Router) routerCc.getAnnotation(Router.class)).host().toLowerCase();
-                    pathValue = ((Router) routerCc.getAnnotation(Router.class)).path().toLowerCase();
+                    schemeValue = ((Router) routerCc.getAnnotation(Router.class)).scheme();
+                    hostValue = ((Router) routerCc.getAnnotation(Router.class)).host();
+                    pathValue = ((Router) routerCc.getAnnotation(Router.class)).path();
                     thread = ((Router) routerCc.getAnnotation(Router.class)).thread();
                     priority = ((Router) routerCc.getAnnotation(Router.class)).priority();
                     hold = ((Router) routerCc.getAnnotation(Router.class)).hold();
@@ -112,18 +119,26 @@ class RouterCollect extends AbsRouterCollect {
                         interceptorClass.append("new Class[]{");
                         for (MemberValue mv : interceptorClassArrayValue.getValue()) {
                             final ClassMemberValue cmv = (ClassMemberValue) mv;
-//                            CtClass interceptorCc = getCtClass(cmv.getValue());
-//                            Interceptor interceptorAnnotation =
-//                                  (Interceptor) interceptorCc.getAnnotation(Interceptor.class);
-//                            if (interceptorAnnotation == null) {
-//                               throw new Exception("please make sure interceptor has use @Interceptor annotation: "
-//                                      + interceptorCc.getName());
-//                            }
                             interceptorClass.append(cmv.getValue());
                             interceptorClass.append(".class,");
                         }
                         interceptorClass.deleteCharAt(interceptorClass.length() - 1);
                         interceptorClass.append("}");
+                    }
+
+                    ArrayMemberValue interceptorNameArrayValue =
+                            (ArrayMemberValue) annotation.getMemberValue("interceptorName");
+                    if (interceptorNameArrayValue != null) {
+                        interceptorName = new StringBuilder();
+                        interceptorName.append("new String[]{");
+                        for (MemberValue mv : interceptorNameArrayValue.getValue()) {
+                            final StringMemberValue smv = (StringMemberValue) mv;
+                            interceptorName.append("\"");
+                            interceptorName.append(smv.getValue());
+                            interceptorName.append("\",");
+                        }
+                        interceptorName.deleteCharAt(interceptorName.length() - 1);
+                        interceptorName.append("}");
                     }
                 }
 
@@ -179,6 +194,8 @@ class RouterCollect extends AbsRouterCollect {
                 metaBuilder.append(", ");
                 metaBuilder.append(interceptorClass != null ? interceptorClass.toString() : "null");
                 metaBuilder.append(", ");
+                metaBuilder.append(interceptorName != null ? interceptorName.toString() : "null");
+                metaBuilder.append(", ");
                 metaBuilder.append(thread);
                 metaBuilder.append(", ");
                 metaBuilder.append(priority);
@@ -187,6 +204,11 @@ class RouterCollect extends AbsRouterCollect {
                 metaBuilder.append(")");
 
                 String uri = schemeValue + "://" + hostValue + pathValue;
+                if (!isPlaceholderLegal(schemeValue, hostValue, pathValue)) {
+                    throw new Exception("\"" + uri + "\" on " + routerCc.getName() +
+                            "\ncan't use regex outside placeholder <>," +
+                            "\nand must be unique legal identifier inside placeholder <>");
+                }
                 boolean isAnyRegex = isAnyRegex(schemeValue, hostValue, pathValue);
                 if (isAnyRegex) {
                     items.add("    put(\"" + uri + "\", " + metaBuilder + ", data); \n");
@@ -198,7 +220,7 @@ class RouterCollect extends AbsRouterCollect {
                 String duplicate = StoreUtil.insertUri(uri, routerCc);
                 if (duplicate != null) {
                     throw new Exception("\"" + uri + "\" on " + routerCc.getName() +
-                            " has duplication of name with class: " + duplicate);
+                            "\nhas duplication of name with class: " + duplicate);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -231,6 +253,36 @@ class RouterCollect extends AbsRouterCollect {
             }
         }
         return false;
+    }
+
+    private boolean isPlaceholderLegal(String... strings) {
+        Set<String> identifier = new HashSet<>();
+        for (String string : strings) {
+            Matcher matcher = placeholderPattern.matcher(string);
+            boolean isMatcher = false;
+            // inside <>, must unique and identifier
+            while (matcher.find()) {
+                isMatcher = true;
+                String placeholder = matcher.group();
+                if (!placeholder.matches("<[a-zA-Z_]+\\w*>")) {
+                    return false;
+                }
+                // unique
+                if (!identifier.add(placeholder)) {
+                    return false;
+                }
+            }
+            // outside <>, must be \w or /
+            if (isMatcher) {
+                String[] splits = placeholderPattern.split(string);
+                for (String split : splits) {
+                    if (!pattern.matcher(split).matches()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private String schemeToRouter(String[] strings) {

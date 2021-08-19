@@ -1,19 +1,20 @@
 package com.didi.demo.fragment;
 
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.didi.drouter.annotation.Router;
 import com.didi.drouter.api.DRouter;
 import com.didi.drouter.demo.R;
-import com.didi.drouter.store.ServiceKey;
-import com.didi.drouter.utils.RouterLogger;
 import com.didi.drouter.page.IPageBean;
 import com.didi.drouter.page.IPageRouter;
 import com.didi.drouter.page.RouterPageStack;
+import com.didi.drouter.store.ServiceKey;
+import com.didi.drouter.utils.RouterLogger;
 
 @Router(path = "/activity/router_page_stack")
 public class RouterPageStackActivity extends AppCompatActivity {
@@ -28,10 +29,10 @@ public class RouterPageStackActivity extends AppCompatActivity {
         RouterPageStack pageRouter = new RouterPageStack(getSupportFragmentManager(), R.id.fragment_container);
         pageRouter.addPageObserver(new IPageRouter.IPageObserver() {
             @Override
-            public void onPageChange(@NonNull IPageBean from, @NonNull IPageBean to) {
-                RouterLogger.getAppLogger().d(from.getPageUri() +  " -> " + to.getPageUri());
+            public void onPageChange(@NonNull IPageBean from, @NonNull IPageBean to, int type) {
+                RouterLogger.getAppLogger().d(from.getPageUri() +  " -> " + to.getPageUri() + "  type:" + type);
             }
-        }, this);
+        }, true, this);
         DRouter.register(
                 ServiceKey.build(IPageRouter.class).setAlias("router_page_stack").setLifecycleOwner(this),
                 pageRouter);
